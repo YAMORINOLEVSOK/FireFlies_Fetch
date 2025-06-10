@@ -1,109 +1,90 @@
 #!/usr/bin/env python3
 """
 fireflies_bulk_download.py
-==========================
 Bulk‑download every Fireflies.ai transcript (speaker‑by‑speaker text).
 
-Quick start (inside ~/fireflies_bulk):
-    python3 -m pip install --upgrade pip
+Quick start:
     pip install requests
     export FIREFLIES_TOKEN="your-api-key"
     python3 fireflies_bulk_download.py
 """
 
-import os
-import pathlib
-import time
-import requests
-import re
+import os, pathlib, time, requests, re, sys
 
-# ──────────────────────────────────────────────────────────────────────────────
 API_URL   = "https://api.fireflies.ai/graphql"
 TOKEN     = os.getenv("FIREFLIES_TOKEN")
 OUT_DIR   = pathlib.Path("output")
-PAGE_SIZE = 50  # GraphQL max page size
-# ──────────────────────────────────────────────────────────────────────────────
+PAGE_SIZE = 50
 
 if not TOKEN:
-    raise SystemExit("❌  Set FIREFLIES_TOKEN in your shell first.")
+    sys.exit("❌  Set FIREFLIES_TOKEN first.")
 
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
 LIST_QUERY = """
-  query ListTranscripts($skip: Int!, $limit: Int!) {
-    transcripts(skip: $skip, limit: $limit) {
-      id
-      title
-    }
+query ($skip:Int!, $limit:Int!){
+  transcripts(skip:$skip, limit:$limit){
+    id title
   }
+}
 """
 
 TRANSCRIPT_QUERY = """
-  query Transcript($id: String!) {
-    transcript(id: $id) {
-      sentences {
-        speaker_name
-        text
-      }
-    }
+query ($id:String!){
+  transcript(id:$id){
+    sentences{ speaker_name text }
   }
+}
 """
 
 def gql(query: str, variables: dict):
-    """Send a GraphQL request and return the 'data' field."""
-    response = requests.post(
-        API_URL,
-        json={"query": query, "variables": variables},
-        headers=HEADERS,
-        timeout=30,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    if "errors" in payload:
-        raise RuntimeError(payload["errors"])
-    return payload["data"]
+    r = requests.post(API_URL, json={"query": query, "variables": variables},
+                      headers=HEADERS, timeout=30)
+    r.raise_for_status()
+    j = r.json()
+    if "errors" in j:
+        raise RuntimeError(j["errors"])
+    return j["data"]
 
 def clean(name: str) -> str:
-    """Return a filesystem‑safe title capped at 100 chars."""
     return re.sub(r"[^\w\s.-]", "_", name).strip()[:100] or "untitled"
 
-def main() -> None:
+def main():
     OUT_DIR.mkdir(exist_ok=True)
     skip = 0
 
     while True:
         batch = gql(LIST_QUERY, {"skip": skip, "limit": PAGE_SIZE})["transcripts"]
         if not batch:
-            break  # no more results
+            break
 
         for t in batch:
-            tid   = t["id"]
-            title = clean(t.get("title") or tid)
-            fn    = OUT_DIR / f"{title}_{tid}.txt"
-
+            tid, title = t["id"], clean(t.get("title") or tid)
+            fn = OUT_DIR / f"{title}_{tid}.txt"
             if fn.exists():
-                print(f"✔︎  {fn.name} already exists; skipping")
+                print(f"✔︎  {fn.name} exists; skipping")
                 continue
 
-            # ── fetch full transcript ────────────────────────────────────────
-            sent_data = gql(TRANSCRIPT_QUERY, {"id": tid})["transcript"]["sentences"]
-
-            if not sent_data:  # None or empty list – nothing to save
-                print(f"⚠️  {fn.name}: no sentence data; skipping")
+            # ── fetch full transcript, skipping 404s ──────────────
+            try:
+                sent_data = gql(TRANSCRIPT_QUERY, {"id": tid})["transcript"]["sentences"]
+            except RuntimeError as err:
+                # Fireflies returns 404 object_not_found when a transcript is missing
+                print(f"⚠️  {title}: {err.args[0][0]['message']} – skipped")
                 continue
 
-            text = "\n".join(
-                f"{s.get('speaker_name', 'Speaker')}: {s.get('text', '').strip()}"
-                for s in sent_data
-            )
+            if not sent_data:
+                print(f"⚠️  {title}: no sentence data – skipped")
+                continue
 
+            text = "\n".join(f"{s['speaker_name']}: {s['text']}" for s in sent_data)
             fn.write_text(text, encoding="utf-8")
             print(f"⬇︎  saved {fn.name}")
-            time.sleep(0.2)  # be polite to the API
-        # ─────────────────────────────────────────────────────────────────────
+            time.sleep(0.2)
+        # ─────────────────────────────────────────────────────────
         skip += PAGE_SIZE
 
-    print(f"\n✅  All done! Transcripts are in → {OUT_DIR.resolve()}")
+    print(f"\n✅  Done! Transcripts in → {OUT_DIR.resolve()}")
 
 if __name__ == "__main__":
     main()
