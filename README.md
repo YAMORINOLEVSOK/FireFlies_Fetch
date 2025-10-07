@@ -1,115 +1,213 @@
-# fireflies-bulk-download
+# Fetch Fireflies Transcripts
 
-> **Bulk‑download every Fireflies.ai transcript you own, as clean speaker‑by‑speaker text files, with a single Python command.**
-
----
-
-## ✨ Features
-
-| What it does                                                                  | Why it matters                                                       |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 🔄 Paginates through **all** your meetings via Fireflies’ public GraphQL API  | No more clicking “Download” one meeting at a time                    |
-| 🗣  Pulls the full **sentence list** (speaker‑labelled)                       | Gives you raw, analysis‑ready text—not the summary page HTML         |
-| 💾 Saves each file as `<title>_<id>.txt` in an **output/** folder             | Easy to sort, grep, or ingest into ChatGPT & LLM pipelines           |
-| ♻︎ Skips files it’s already downloaded                                        | Safe to rerun any time—you’ll only fetch new stuff                   |
-| ⚠️  Gracefully skips meetings with no transcript data (e.g. still processing) | Keeps the run going, prints a warning, moves on                      |
-| 🛠  Just one dependency: **requests**                                         | Works in any Python 3.8 + environment, including Replit & Codespaces |
+> **Ferramenta para baixar todas as transcrições do Fireflies.ai via API GraphQL, com texto separado por falante.**
 
 ---
 
-## 🖥  Requirements
+## 📋 Descrição
 
-* **Python 3.8+** (install from [https://python.org](https://python.org) or via Homebrew on macOS: `brew install python@3`)
-* A **Fireflies.ai API token** (Pro/Business plan or higher)
+Este projeto automatiza o download em massa de transcrições do Fireflies.ai, facilitando o acesso aos dados de reuniões para análise, processamento ou backup. A ferramenta utiliza a API GraphQL oficial do Fireflies para extrair transcrições com identificação de falantes.
 
-> **Heads‑up:** Free plans don’t expose the API token menu. You *can* copy the `token` cookie instead, but the official token is easier.
+### ✨ Funcionalidades
+
+| Recurso | Descrição |
+| ------- | --------- |
+| 🔄 **Download em massa** | Baixa automaticamente todas as transcrições da sua conta via API GraphQL |
+| 🗣️ **Identificação de falantes** | Preserva os rótulos de quem falou cada trecho (`Nome: texto`) |
+| 💾 **Organização automática** | Salva cada transcrição como `<titulo>_<id>.txt` no diretório `output/` |
+| ♻️ **Retomada inteligente** | Ignora arquivos já baixados, permitindo executar novamente sem duplicar |
+| ⚠️ **Tratamento de erros** | Lida com transcrições indisponíveis ou em processamento sem interromper a execução |
+| 📊 **Scripts auxiliares** | Inclui ferramentas para contagem e análise de discrepâncias |
 
 ---
 
-## 🚀 Quick‑start
+## 🔧 Requisitos
+
+- **Python 3.8+** ([python.org](https://python.org))
+- **Token API do Fireflies.ai** (plano Pro/Business ou superior)
+- Biblioteca `requests` (instalada automaticamente via requirements.txt)
+
+> **Nota:** Planos gratuitos não expõem o menu de token da API. É possível usar o cookie `token` como alternativa, mas o token oficial é recomendado.
+
+---
+
+## 🚀 Instalação e Uso
+
+### 1. Clone o repositório
 
 ```bash
-# 1  Grab the repo
-$ git clone https://github.com/your‑username/fireflies‑bulk‑download.git
-$ cd fireflies‑bulk‑download
-
-# 2  (Optional) keep deps tidy with a venv
-$ python3 -m venv venv && source venv/bin/activate
-
-# 3  Install the single dependency
-$ pip install requests
-
-# 4  Export your Fireflies token (replace with your own)
-$ export FIREFLIES_TOKEN="xxxxxxxx‑xxxx‑xxxx‑xxxx‑xxxxxxxxxxxx"
-
-# 5  Run it
-$ python3 fireflies_bulk_download.py
+git clone https://github.com/SEU-USUARIO/Fetch-Fireflies-Transcripts.git
+cd Fetch-Fireflies-Transcripts
 ```
 
-You’ll see lines like:
+### 2. Crie um ambiente virtual (opcional, mas recomendado)
+
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Instale as dependências
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure o token da API
+
+Você precisa obter seu token da API do Fireflies:
+
+1. Acesse [app.fireflies.ai](https://app.fireflies.ai)
+2. Vá em **Settings › Integrations**
+3. Role até **Developer / API** e clique em **Generate Token**
+4. Copie o token gerado
+
+Configure o token como variável de ambiente:
+
+**Windows (PowerShell):**
+```powershell
+$env:FIREFLIES_TOKEN="seu-token-aqui"
+```
+
+**Windows (CMD):**
+```cmd
+set FIREFLIES_TOKEN=seu-token-aqui
+```
+
+**Linux/Mac:**
+```bash
+export FIREFLIES_TOKEN="seu-token-aqui"
+```
+
+### 5. Execute o script principal
+
+```bash
+python fireflies_fetch_script
+```
+
+O script irá:
+- Paginar por todas as suas transcrições
+- Baixar cada uma no formato `output/<titulo>_<id>.txt`
+- Exibir o progresso no terminal
+- Pular arquivos já existentes
+
+### Exemplo de saída:
 
 ```
-⬇︎  saved Customer Demo - 2024‑05‑01_a1b2c3d4.txt
-✔︎  Kickoff Call - 2024‑04‑18_e5f6g7h8.txt already exists; skipping
-⚠️  Weekly Sync - still processing; skipping
+⬇︎  saved Reunião Cliente XYZ - 2024-05-01_a1b2c3d4.txt
+✔︎  Kickoff Call - 2024-04-18_e5f6g7h8.txt exists; skipping
+⚠️  Weekly Sync: object_not_found – skipped
+
+✅  Done! Transcripts in → C:\Users\...\output
 ```
 
-Finished files live in **`output/`**.
+---
+
+## 📂 Estrutura do Projeto
+
+```
+Fetch-Fireflies-Transcripts/
+├── fireflies_fetch_script      # Script principal de download
+├── _count_total.py              # Contador de transcrições totais
+├── analyze_discrepancies.py    # Análise de discrepâncias (opcional)
+├── build_calendar.py            # Construtor de calendário (opcional)
+├── requirements.txt             # Dependências Python
+├── README.md                    # Este arquivo
+├── .gitignore                   # Arquivos ignorados pelo Git
+└── output/                      # Diretório de saída (não versionado)
+    └── (suas transcrições aqui)
+```
 
 ---
 
-## 🔑 Obtaining your Fireflies API token
+## 🛠️ Scripts Auxiliares
 
-1. Log in at [https://app.fireflies.ai](https://app.fireflies.ai).
-2. Click **Settings › Integrations**.
-3. At the bottom, open **Developer / API** and hit **Generate Token**.
-4. Copy the long UUID string and export it as `FIREFLIES_TOKEN`.
+### `_count_total.py`
+Conta o número total de transcrições disponíveis na API sem baixá-las.
 
-*(If you don’t see “Developer / API”, upgrade your plan or copy the `token` cookie via DevTools > Application > Cookies.)*
+```bash
+python _count_total.py
+```
 
----
+### `analyze_discrepancies.py`
+Compara um calendário de aulas planejadas com as transcrições baixadas para identificar discrepâncias de professores.
 
-## 🛠  Script options & tweaks
+**Requer:**
+- Arquivo CSV com calendário de aulas em `Files/calendario_aulas.csv`
+- Transcrições em `output/`
 
-| What                        | How                                                                                      |
-| --------------------------- | ---------------------------------------------------------------------------------------- |
-| **Change the page size**    | Edit `PAGE_SIZE` at the top (max = 50)                                                   |
-| **Throttle API calls**      | Adjust the `time.sleep(0.2)` line to be nicer or faster                                  |
-| **Filter by date range**    | Replace the `LIST_QUERY` with the `meetings` query and pass `startDate` / `endDate` vars |
-| **Different output format** | Convert `text` to JSON/CSV before `fn.write_text()`                                      |
+```bash
+python analyze_discrepancies.py
+```
 
-Code is fully commented—feel free to hack away.
+### `build_calendar.py`
+Constrói um calendário formatado a partir de uma planilha de alocação.
 
----
+**Requer:**
+- Arquivo CSV de entrada em `Files/`
 
-## 🆘 Troubleshooting
-
-| Symptom                          | Likely cause                                          | Fix                                                    |
-| -------------------------------- | ----------------------------------------------------- | ------------------------------------------------------ |
-| `RuntimeError: Unauthorized`     | Bad / expired token                                   | Regenerate token, `export FIREFLIES_TOKEN=...`         |
-| `KeyError: 'sentences'`          | Your plan returns a different field (e.g. `segments`) | Swap the inner GraphQL query accordingly               |
-| Script ends instantly, no output | No meetings in this workspace                         | Switch workspace in Fireflies or use the right account |
-| Downloads HTML not text          | You cloned an old commit – update to latest script    | `git pull`                                             |
+```bash
+python build_calendar.py
+```
 
 ---
 
-## 🤝 Contributing
+## ⚙️ Configurações Avançadas
 
-Pull requests are welcome! Please open an issue first if you plan a large change so we can discuss.
+Você pode ajustar o comportamento do script editando as variáveis no início do arquivo `fireflies_fetch_script`:
 
----
-
-## 📄 License
-
-[MIT](LICENSE)
-
----
-
-## 🙏 Acknowledgements
-
-* Original bulk‑export idea & first script by **[Leslie Barry](https://lesliebarry.substack.com/p/solved-firefliesai-bulk-transcript)**
-* Tweaked & expanded by the Human Race team to handle speaker diarization, retries, and workspace‑safe reruns.
+| Variável | Padrão | Descrição |
+| -------- | ------ | --------- |
+| `PAGE_SIZE` | 50 | Número de transcrições por página (máximo: 50) |
+| `OUT_DIR` | `output` | Diretório de destino dos arquivos |
+| `time.sleep(0.2)` | 0.2s | Intervalo entre requisições (ajuste se necessário) |
 
 ---
 
-Happy exporting! 🎉
+## 🐛 Solução de Problemas
+
+| Problema | Possível Causa | Solução |
+| -------- | -------------- | ------- |
+| `RuntimeError: Unauthorized` | Token inválido ou expirado | Regenere o token e configure novamente |
+| `TOKEN_MISSING` | Variável de ambiente não configurada | Execute o comando `set` ou `export` com seu token |
+| Nenhuma transcrição baixada | Workspace vazio ou conta errada | Verifique se há reuniões na sua conta Fireflies |
+| `KeyError: 'sentences'` | API retorna formato diferente | Sua conta pode usar `segments` em vez de `sentences` |
+
+---
+
+## 📝 Observações
+
+- **Privacidade:** Os arquivos de transcrição não são incluídos no repositório por padrão (`.gitignore`)
+- **Uso educacional:** Este projeto foi desenvolvido para uso acadêmico e administrativo
+- **API Rate Limits:** O script inclui delays entre requisições para respeitar limites da API
+
+---
+
+## 🤝 Contribuições
+
+Contribuições são bem-vindas! Sinta-se à vontade para:
+- Reportar bugs
+- Sugerir melhorias
+- Enviar pull requests
+
+---
+
+## 📄 Licença
+
+MIT License - Sinta-se livre para usar e modificar conforme necessário.
+
+---
+
+## 🙏 Créditos
+
+- Ideia original e primeiro script por **[Leslie Barry](https://lesliebarry.substack.com/p/solved-firefliesai-bulk-transcript)**
+- Adaptação e melhorias para uso educacional
+
+---
+
+**Desenvolvido para automação de processos educacionais** 🎓
